@@ -2,7 +2,7 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
+	// "fmt"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -109,7 +109,9 @@ func GamesGet(w http.ResponseWriter, r *http.Request) {
 	for _, v := range PendingGamesById {
 		ret = append(ret, v)
 	}
-	json.NewEncoder(w).Encode(ret)
+	if err := json.NewEncoder(w).Encode(ret); err != nil {
+        panic(err)
+    }
 }
 
 func GamesNew(w http.ResponseWriter, r *http.Request) {
@@ -119,12 +121,11 @@ func GamesNew(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	user := UserFromRequest(r)
-	fmt.Println(user)
 	if _, exists := UsersGames[user.Id]; exists {
 		http.Error(w, "Already has a game", 300)
 		return
 	}
-	game := PendingGame{rand.Int31(), user.Username, Board{make(map[int32][]string), Rows, Cols}}
+	game := PendingGame{rand.Int31(), user.Username, Board{make(map[string][]string), Rows, Cols}}
 	PendingGamesById[game.Id] = game
 	UsersGames[user.Id] = game.Id
 

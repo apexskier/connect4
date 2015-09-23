@@ -23,4 +23,5 @@ var routes = Routes{
 	Route{"GameAccept", "POST", "/api/games/{gameid}", GameAccept},
 	Route{"GameStatus", "GET", "/api/games/{gameid}", GameStatus},
 	Route{"GameMove", "PUT", "/api/games/{gameid}", GameMove},
+	Route{"GameLeave", "DELETE", "/api/games/{gameid}", GameDelete},
 }

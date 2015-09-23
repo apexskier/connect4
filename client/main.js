@@ -4,7 +4,6 @@ $(function() {
         return $.get('/api/user').then(function(data) {
             if (data) {
                 data = JSON.parse(data);
-                console.log(data);
                 user = data.user;
                 if (data.game >= 0) {
                     currentGameService.setId(data.game);
@@ -19,6 +18,9 @@ $(function() {
     function apiFail(err) {
         console.log(err);
         alert(err.responseText.trim() || err.statusText);
+        if (err.status == 404 || err.status == 500) {
+            appRouter.navigate('index', {trigger: true});
+        }
     }
     var AppRouter = Backbone.Router.extend({
         routes: {
@@ -29,9 +31,8 @@ $(function() {
             '*anything':    'index'
         },
         index: function() {
-            console.log('index');
             if (this.validate_loggedin()) {
-                if (currentGameService.get().hasOwnProperty('id')) {
+                if (currentGameService.get().hasOwnProperty('id') && currentGameService.get().id) {
                     this.navigate('play/' + currentGameService.get().id, {trigger: true});
                 } else {
                     this.navigate('games', {trigger: true});
@@ -41,11 +42,9 @@ $(function() {
             }
         },
         login: function() {
-            console.log('login');
             this.swapView(new LoginView());
         },
         games: function() {
-            console.log('games');
             if (this.validate_loggedin()) {
                 this.swapView(new GamesView());
             } else {
@@ -53,16 +52,15 @@ $(function() {
             }
         },
         play: function(gameid) {
-            console.log('play', gameid);
             var that = this;
-            if (this.validate_loggedin()) {
+            if (this.validate_loggedin() && gameid) {
                 $.ajax({
                     type: 'GET',
                     url: '/api/games/' + gameid,
                     contentType: 'application/json'
                 }).done(function(data) {
                     data = JSON.parse(data);
-                    console.log(data);
+                    data.board = false;
                     if (!data.hasOwnProperty(data.player2)) {
                         data.player2 = false;
                     }
@@ -74,7 +72,6 @@ $(function() {
         },
 
         validate_loggedin: function() {
-            console.log(user);
             return user;
         },
 
@@ -171,7 +168,6 @@ $(function() {
                 contentType: 'application/json'
             }).done(function(data) {
                 data = JSON.parse(data);
-                console.log(data);
                 appRouter.navigate('play/' + gameid, {trigger: true});
             }).fail(apiFail);
         }
@@ -213,7 +209,6 @@ $(function() {
         login: function(e) {
             e.preventDefault();
             var username = this.$('#login-username').val();
-            console.log(username);
             eraseCookie('connect4id');
             $.ajax({
                 type: 'POST',
@@ -234,27 +229,61 @@ $(function() {
     var PlayView = Backbone.View.extend({
         template: _.template($('#play-view').html()),
         initialize: function() {
-            console.log(this.model);
             currentGameService.setId(this.model.id);
             this.listenTo(currentGameService.get(), 'change', this.render);
             this.listenTo(currentGameService.get(), 'start', this.render);
             this.listenTo(currentGameService.get(), 'stop', this.leave);
         },
         events: {
+            'click .col': 'move',
+            'touch .col': 'move',
+            'click #leave-game': 'leave_click'
         },
-        leave: function() {
-            appRouter.navigate('index', {trigger: true});
+        leave: function(e) {
+            $.ajax({
+                type: 'DELETE',
+                url: '/api/games/' + this.model.id,
+                contentType: 'application/json'
+            }).always(function(data) {
+                appRouter.navigate('index', {trigger: true});
+            });
+        },
+        leave_click: function(e) {
+            currentGameService.setId(null);
         },
         render: function(model) {
-            console.log(model);
             if (model) {
                 this.model = model;
             }
-            console.log(this.model);
-            this.$el.html(this.template(this.model));
+            this.$el.html(this.template({game: this.model, user: user}));
             return this;
+        },
+        move: function(e) {
+            var $target = $(e.target).closest('.col');
+            var col = $target.data('col');
+            $.ajax({
+                type: 'PUT',
+                url: '/api/games/' + this.model.id,
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    gameid: this.model.id,
+                    row: col
+                })
+            }).done(function(data) {
+                data = JSON.parse(data);
+                console.log(data);
+                if (data.status == "illegal") {
+                    alert(data.details);
+                } else if (data.status == "success") {
+                    currentGameService.merge(data.game);
+                } else if (data.status == "win") {
+                    currentGameService.merge(data.game);
+                    alert("you won!")
+                    appRouter.navigate('games', {trigger: true});
+                }
+            }).fail(apiFail);
         }
-    })
+    });
 
     var pendingGames = {};
     var eventPendingGames = {};
@@ -301,7 +330,8 @@ $(function() {
         var poller = null;
         return {
             get: get,
-            setId: set
+            setId: set,
+            merge: merge
         }
 
         function get() {
@@ -309,9 +339,10 @@ $(function() {
         }
 
         function set(id) {
+            game.id = null;
             if (id === null) {
                 game.trigger('stop');
-                cancelInterval(poller);
+                clearInterval(poller);
             } else {
                 game.trigger('change', id)
             }
@@ -323,15 +354,32 @@ $(function() {
             currentId = id;
         }
 
+        function merge(data) {
+            if (!data.hasOwnProperty('player2')) data.player2 = false;
+            _.extend(game, data);
+            for (var col = 0; col < game.board.cols; col++) {
+                if (!game.board.slots.hasOwnProperty(col)) game.board.slots[col] = []
+                for (i = game.board.slots[col].length; i < game.board.rows; i++) {
+                    game.board.slots[col].push(false);
+                }
+                game.board.slots[col].reverse()
+            }
+            game.trigger('change', data)
+        }
+
         function poll() {
             if (currentId) {
                 $.get('/api/games/' + currentId).done(function(data) {
                     data = JSON.parse(data);
-                    _.extend(game, data);
-                    game.trigger('change', data)
-                    console.log(game);
+                    merge(data);
                 }).fail(function(err) {
                     console.log(err);
+                    alert("You lost.");
+                    set(null);
+                    appRouter.navigate('index', {trigger: true});
+                    if (err.status == 0) {
+                        user = null;
+                    }
                 });
             }
         }

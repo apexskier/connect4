@@ -6,6 +6,40 @@
         <title>Connect4 | Cameron Little</title>
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            .board {
+                position: relative;
+                width: 100%;
+                height: 50%;
+            }
+            .board .col {
+                float: left;
+                width: 14%;
+            }
+            .board .slot {
+                height: 40px;
+                background-color: #ccc;
+                border: 1px solid #999;
+                margin: 2px 2px 4px;
+                position: relative;
+            }
+            .board .token {
+                display: inline-block;
+                border-radius: 100%;
+                height: 100%;
+                width: 100%;
+                background-color: transparent;
+                text-align: center;
+                vertical-align: middle;
+            }
+            .board .red .token {
+                background-color: red;
+            }
+            .board .black .token {
+                background-color: black;
+                color: white;
+            }
+        </style>
 
         <!-- link rel="stylesheet" href="css/main.css" -->
     </head>
@@ -59,12 +93,30 @@
             </form>
         </script>
         <script type="text/template" id="play-view">
-            <% if (player2 !== false) { %>
-            <h3><%- player1 %> VS <%- player2 %></h3>
+            <% if (game.player2 !== false) { %>
+            <h3><%- game.player1 %> VS <%- game.player2 %></h3>
             <% } else { %>
             <h3>Waiting for game to start...</h3>
             <% } %>
-            <div class="board"></div>
+            <% if (game.board && game.board !== false) { %>
+            <button id="leave-game">Leave Game</button>
+            <div class="board">
+                <% for (var col = 0; col < game.board.cols; col++) { %>
+                <div class="col" data-col="<%- col %>">
+                    <% for (var row = 0; row < game.board.rows; row++) { %>
+                    <div class="slot<%= (game.board.slots[col][row] === false) ? ' empty' : ''%><%= (game.board.slots[col][row] !== false && game.board.slots[col][row] === user.username) ? ' red' : ' black' %>"
+                         data-col="<%- col %>" data-row="<%- row %>">
+                        <% if (game.board.slots[col][row] !== false) { %>
+                        <span class="token">
+                            <%- game.board.slots[col][row] %>
+                        </span>
+                        <% } %>
+                    </div>
+                    <% } %>
+                </div>
+                <% } %>
+            </div>
+            <% } %>
         </script>
     </body>
 </html>

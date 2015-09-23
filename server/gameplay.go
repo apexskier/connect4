@@ -7,9 +7,9 @@ import (
 	"io"
 	"io/ioutil"
 	"strconv"
+    "fmt"
 
 	"github.com/gorilla/mux"
-	// "fmt"
 )
 
 var (
@@ -21,6 +21,7 @@ type Game struct {
 	Player1 string `json:"player1"`
 	Player2 string `json:"player2"`
 	Board   Board  `json:"board"`
+    LastPlay    string  `json:"lastplay"`
 }
 
 type PendingGame struct {
@@ -30,14 +31,14 @@ type PendingGame struct {
 }
 
 type Board struct {
-	Slots map[int32][]string `json:"slots"`
-	Rows  int32              `json:"rows"`
-	Cols  int32              `json:"cols"`
+	Slots map[string][]string   `json:"slots"`
+	Rows  int32                 `json:"rows"`
+	Cols  int32                 `json:"cols"`
 }
 
 type Move struct {
 	Gameid int32 `json:"gameid"`
-	Row    int32 `json:"row"`
+	Col    int32 `json:"row"`
 }
 
 func getGameId(w http.ResponseWriter, r *http.Request) (int32, error) {
@@ -72,7 +73,7 @@ func GameAccept(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	user := UserFromRequest(r)
-	game := Game{pendinggame.Id, pendinggame.Player1, user.Username, pendinggame.Board}
+	game := Game{pendinggame.Id, pendinggame.Player1, user.Username, pendinggame.Board, user.Username}
 
 	delete(PendingGamesById, gameid)
 	ActiveGamesById[game.Id] = game
@@ -102,36 +103,164 @@ func GameStatus(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+type GameMoveResponse struct {
+    Game    Game    `json:"game"`
+    Status  string  `json:"status"`
+    Details string  `json:"details"`
+}
 func GameMove(w http.ResponseWriter, r *http.Request) {
 	var (
 		move Move
+        status string
+        details string
+        col     []string
+        exists bool
+        user Person
+        game Game
+        gameid int32
+        err error
 	)
 
-	gameid, err := getGameId(w, r)
+	user = *UserFromRequest(r)
+
+    defer func() {
+        if status == "success" {
+            // TODO: check for win
+            game.LastPlay = user.Username
+            ActiveGamesById[game.Id] = game
+
+            // Check if they've won
+            // check column
+            colL := len(col)
+            fmt.Println(col)
+            // col is the old col, so this is weird.
+            if colL >= int(Winl) - 1 {
+                check := col[colL - int(Winl - 1):]
+                fmt.Println(check)
+                if (check[0] == user.Username &&
+                    check[1] == user.Username &&
+                    check[2] == user.Username) {
+                    status = "win"
+                }
+            }
+            if status != "win" {
+                // check row
+            }
+
+        }
+        response := GameMoveResponse{game, status, details}
+        json.NewEncoder(w).Encode(response)
+
+        if status == "win" {
+            delete(ActiveGamesById, game.Id)
+            delete(PendingGamesById, game.Id)
+            delete(UsersGames, UsersByUsername[game.Player1].Id)
+            delete(UsersGames, UsersByUsername[game.Player2].Id)
+        }
+    }()
+
+	gameid, err = getGameId(w, r)
 	if err != nil {
-		http.Error(w, "", 500)
-		return
+        status = "illegal"
+        details = "Game doesn't exist"
+        return
 	}
 
-	game, exists := ActiveGamesById[gameid]
+	game, exists = ActiveGamesById[gameid]
 	if !exists {
-		http.Error(w, "", 404)
-		return
+        status = "illegal"
+        details = "Game not started"
+        return
 	}
+
+    if user.Username != game.Player1 && user.Username != game.Player2 {
+        status = "illegal"
+        details = "not your game"
+        return
+    }
+
 
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 2048))
 	if err != nil {
-		http.Error(w, "", 500)
-		return
+        status = "illegal"
+        details = "invalid request"
+        return
 	}
 	if err := r.Body.Close(); err != nil {
-		http.Error(w, "", 500)
-		return
+        status = "illegal"
+        details = "invalid request"
+        return
 	}
 	if err := json.Unmarshal(body, &move); err != nil {
-		http.Error(w, "Invalid request body", 400)
-		return
+        status = "illegal"
+        details = "invalid request"
+        return
 	}
 
-	json.NewEncoder(w).Encode(game)
+	defer func() {
+		if r := recover(); r != nil {
+			json.NewEncoder(w).Encode("")
+		}
+	}()
+
+    fmt.Print("-- ")
+    fmt.Println(game.LastPlay)
+    fmt.Println(user.Username)
+    if game.LastPlay == user.Username {
+        status = "illegal"
+        details = "not your turn"
+        return
+    }
+
+    if move.Col >= Cols || move.Col < 0 {
+        status = "illegal"
+        details = "not a valid column"
+        return
+    }
+
+    colIdx := strconv.Itoa(int(move.Col))
+    if col, exists = game.Board.Slots[colIdx]; !exists {
+        game.Board.Slots[colIdx] = make([]string, 1)
+        game.Board.Slots[colIdx][0] = user.Username
+        status = "success"
+        return
+    } else {
+        if len(col) >= int(Rows) {
+            status = "illegal"
+            details = "row is full"
+            return
+        }
+        game.Board.Slots[colIdx] = append(col, user.Username)
+        status = "success"
+        return
+    }
+}
+
+func GameDelete(w http.ResponseWriter, r *http.Request) {
+	user := *UserFromRequest(r)
+
+	gameid, err := getGameId(w, r)
+	if err != nil {
+        return
+	}
+
+	game, exists := ActiveGamesById[gameid]
+	if exists {
+        if user.Username != game.Player1 && user.Username != game.Player2 {
+            return
+        }
+        delete(ActiveGamesById, game.Id)
+        delete(UsersGames, UsersByUsername[game.Player1].Id)
+        delete(UsersGames, UsersByUsername[game.Player2].Id)
+        return
+	} else {
+        game, exists := PendingGamesById[gameid]
+        if exists {
+            if user.Username != game.Player1 {
+                return
+            }
+            delete(PendingGamesById, game.Id)
+            delete(UsersGames, user.Id)
+        }
+    }
 }
