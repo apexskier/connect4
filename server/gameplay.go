@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"strconv"
-    "fmt"
 
 	"github.com/gorilla/mux"
 )
@@ -130,13 +129,11 @@ func GameMove(w http.ResponseWriter, r *http.Request) {
             ActiveGamesById[game.Id] = game
 
             // Check if they've won
-            // check column
             colL := len(col)
-            fmt.Println(col)
             // col is the old col, so this is weird.
             if colL >= int(Winl) - 1 {
+                // check column
                 check := col[colL - int(Winl - 1):]
-                fmt.Println(check)
                 if (check[0] == user.Username &&
                     check[1] == user.Username &&
                     check[2] == user.Username) {
@@ -145,8 +142,62 @@ func GameMove(w http.ResponseWriter, r *http.Request) {
             }
             if status != "win" {
                 // check row
+                start := int32(0)
+                if st := move.Col - (Winl - 1); st > start {
+                    start = st
+                }
+                end := move.Col
+                if en := Cols - 1; en < end {
+                    end = en
+                }
+                row := len(game.Board.Slots[strconv.Itoa(int(move.Col))]) - 1
+                for c := start; c <= end; c++ {
+                    num := 0
+                    for j := 0; j < int(Winl); j++ {
+                        col_ := game.Board.Slots[strconv.Itoa(int(c) + j)]
+                        if len(col_) > row && col_[row] == user.Username {
+                            num++
+                        } else {
+                            break
+                        }
+                    }
+                    if num == 4 {
+                        status = "win"
+                        break
+                    }
+                }
             }
-
+            if status != "win" {
+                // check diagonal
+                startCol := int32(0)
+                if st := move.Col - (Winl - 1); st > startCol {
+                    startCol = st
+                }
+                endCol := move.Col
+                if en := Cols - 1; en < endCol {
+                    endCol = en
+                }
+                for c := startCol; c <= endCol; c++ {
+                    startRow := (len(game.Board.Slots[strconv.Itoa(int(move.Col))]) - 1) - int(move.Col - startCol)
+                    num := 0
+                    for j := 0; j < int(Winl); j++ {
+                        col_ := game.Board.Slots[strconv.Itoa(int(c) + j)]
+                        row := startRow + j
+                        if (row < 0) {
+                            break
+                        }
+                        if len(col_) > row && col_[row] == user.Username {
+                            num++
+                        } else {
+                            break
+                        }
+                    }
+                    if num == 4 {
+                        status = "win"
+                        break
+                    }
+                }
+            }
         }
         response := GameMoveResponse{game, status, details}
         json.NewEncoder(w).Encode(response)
@@ -203,9 +254,6 @@ func GameMove(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-    fmt.Print("-- ")
-    fmt.Println(game.LastPlay)
-    fmt.Println(user.Username)
     if game.LastPlay == user.Username {
         status = "illegal"
         details = "not your turn"
