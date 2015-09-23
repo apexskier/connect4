@@ -2,7 +2,7 @@ package server
 
 import (
 	"net/http"
-	// "net/http/cookiejar"
+    "fmt"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -123,6 +123,7 @@ func GameMove(w http.ResponseWriter, r *http.Request) {
 	user = *UserFromRequest(r)
 
     defer func() {
+        fmt.Println("ASDFJLASDAS")
         if status == "success" {
             // TODO: check for win
             game.LastPlay = user.Username
@@ -178,7 +179,7 @@ func GameMove(w http.ResponseWriter, r *http.Request) {
                     endCol = en
                 }
                 for c := startCol; c <= endCol; c++ {
-                    startRow := (len(game.Board.Slots[strconv.Itoa(int(move.Col))]) - 1) - int(move.Col - startCol)
+                    startRow := (len(game.Board.Slots[strconv.Itoa(int(move.Col))]) - 1) - int(move.Col - c)
                     num := 0
                     for j := 0; j < int(Winl); j++ {
                         col_ := game.Board.Slots[strconv.Itoa(int(c) + j)]
@@ -187,6 +188,48 @@ func GameMove(w http.ResponseWriter, r *http.Request) {
                             break
                         }
                         if len(col_) > row && col_[row] == user.Username {
+                            num++
+                        } else {
+                            break
+                        }
+                    }
+                    if num == 4 {
+                        status = "win"
+                        break
+                    }
+                }
+            }
+            if status != "win" {
+                // check other diagonal
+                startCol := int32(0)
+                if st := move.Col - (Winl - 1); st > startCol {
+                    startCol = st
+                }
+                endCol := move.Col
+                if en := Cols - 1; en < endCol {
+                    endCol = en
+                }
+                fmt.Print("- ")
+                fmt.Print(startCol)
+                fmt.Print(", ")
+                fmt.Println(endCol)
+                for c := startCol; c <= endCol; c++ {
+                    fmt.Println("-- ")
+                    startRow := (len(game.Board.Slots[strconv.Itoa(int(move.Col))]) - 1) + int(move.Col - c)
+                    num := 0
+                    for j := 0; j < int(Winl); j++ {
+                        col_ := game.Board.Slots[strconv.Itoa(int(c) + j)]
+                        row := startRow - j
+                        fmt.Print("--- ")
+                        fmt.Print(int(c) + j)
+                        fmt.Print(", ")
+                        fmt.Print(row)
+                        fmt.Print(": ")
+                        if row < 0 || row >= int(Rows) || len(col_) <= row {
+                            break
+                        }
+                        fmt.Println(col_[row])
+                        if col_[row] == user.Username {
                             num++
                         } else {
                             break
