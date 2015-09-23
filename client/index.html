@@ -1,0 +1,70 @@
+<!doctype html>
+<html class="no-js" lang="">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="x-ua-compatible" content="ie=edge">
+        <title>Connect4 | Cameron Little</title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <!-- link rel="stylesheet" href="css/main.css" -->
+    </head>
+    <body>
+        <!--[if lt IE 8]>
+            <p class="browserupgrade">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
+        <![endif]-->
+
+        <!-- Add your site or application content here -->
+        <h2>Connect4</h2>
+        <button id="games">All Games</button>
+        <button id="new-game">New Game</button>
+        <button id="logout">Logout</button>
+        <span id="user"></span>
+        <div id="entry"><p>Hello world!</p></div>
+
+        <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+        <!--script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.map></script-->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/backbone.js/1.2.3/backbone-min.js"></script>
+        <!--script src="https://cdnjs.cloudflare.com/ajax/libs/backbone.js/1.2.3/backbone-min.map"></script-->
+        <script src="cookies.js"></script>
+        <script src="main.js"></script>
+
+        <script type="text/template" id="games-view">
+            <h3>Available Games</h3>
+            <ul id="games-available">
+            </ul>
+        </script>
+        <script type="text/template" id="user-view">
+            <% if (user && user.username) { %><span>Hello <%- user.username %></user><% } %>
+        </script>
+        <script type="text/template" id="empty-games-view">
+            <% if (l <= 0) { %><p>No games available</p><% } %>
+        </script>
+        <script type="text/template" id="list-item-template">
+            <a href="#"><%- name %></a>
+        </script>
+        <script type="text/template" id="available-game-view">
+            <a href="javascript:void(0)" class="play-game" data-gameid="<%- id %>">
+                <%- player1 %> <small><%- id %></small>
+            </a>
+        </script>
+        <script type="text/template" id="login-view">
+            <h3>Login</h3>
+            <form id="login-form">
+                <p>
+                    <input type="text" maxlength="40" minlength="2" name="username" id="login-username" placeholder="username" required>
+                    <button type="submit">Submit</button>
+                </p>
+            </form>
+        </script>
+        <script type="text/template" id="play-view">
+            <% if (player2 !== false) { %>
+            <h3><%- player1 %> VS <%- player2 %></h3>
+            <% } else { %>
+            <h3>Waiting for game to start...</h3>
+            <% } %>
+            <div class="board"></div>
+        </script>
+    </body>
+</html>
