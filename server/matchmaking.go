@@ -109,8 +109,8 @@ func GamesGet(w http.ResponseWriter, r *http.Request) {
 		ret = append(ret, v)
 	}
 	if err := json.NewEncoder(w).Encode(ret); err != nil {
-        panic(err)
-    }
+		panic(err)
+	}
 }
 
 func GamesNew(w http.ResponseWriter, r *http.Request) {

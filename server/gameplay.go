@@ -1,11 +1,11 @@
 package server
 
 import (
-	"net/http"
-    "fmt"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
@@ -16,11 +16,11 @@ var (
 )
 
 type Game struct {
-	Id      int32  `json:"id"`
-	Player1 string `json:"player1"`
-	Player2 string `json:"player2"`
-	Board   Board  `json:"board"`
-    LastPlay    string  `json:"lastplay"`
+	Id       int32  `json:"id"`
+	Player1  string `json:"player1"`
+	Player2  string `json:"player2"`
+	Board    Board  `json:"board"`
+	LastPlay string `json:"lastplay"`
 }
 
 type PendingGame struct {
@@ -30,9 +30,9 @@ type PendingGame struct {
 }
 
 type Board struct {
-	Slots map[string][]string   `json:"slots"`
-	Rows  int32                 `json:"rows"`
-	Cols  int32                 `json:"cols"`
+	Slots map[string][]string `json:"slots"`
+	Rows  int32               `json:"rows"`
+	Cols  int32               `json:"cols"`
 }
 
 type Move struct {
@@ -103,192 +103,192 @@ func GameStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 type GameMoveResponse struct {
-    Game    Game    `json:"game"`
-    Status  string  `json:"status"`
-    Details string  `json:"details"`
+	Game    Game   `json:"game"`
+	Status  string `json:"status"`
+	Details string `json:"details"`
 }
+
 func GameMove(w http.ResponseWriter, r *http.Request) {
 	var (
-		move Move
-        status string
-        details string
-        col     []string
-        exists bool
-        user Person
-        game Game
-        gameid int32
-        err error
+		move    Move
+		status  string
+		details string
+		col     []string
+		exists  bool
+		user    Person
+		game    Game
+		gameid  int32
+		err     error
 	)
 
 	user = *UserFromRequest(r)
 
-    defer func() {
-        fmt.Println("ASDFJLASDAS")
-        if status == "success" {
-            // TODO: check for win
-            game.LastPlay = user.Username
-            ActiveGamesById[game.Id] = game
+	defer func() {
+		fmt.Println("ASDFJLASDAS")
+		if status == "success" {
+			// TODO: check for win
+			game.LastPlay = user.Username
+			ActiveGamesById[game.Id] = game
 
-            // Check if they've won
-            colL := len(col)
-            // col is the old col, so this is weird.
-            if colL >= int(Winl) - 1 {
-                // check column
-                check := col[colL - int(Winl - 1):]
-                if (check[0] == user.Username &&
-                    check[1] == user.Username &&
-                    check[2] == user.Username) {
-                    status = "win"
-                }
-            }
-            if status != "win" {
-                // check row
-                start := int32(0)
-                if st := move.Col - (Winl - 1); st > start {
-                    start = st
-                }
-                end := move.Col
-                if en := Cols - 1; en < end {
-                    end = en
-                }
-                row := len(game.Board.Slots[strconv.Itoa(int(move.Col))]) - 1
-                for c := start; c <= end; c++ {
-                    num := 0
-                    for j := 0; j < int(Winl); j++ {
-                        col_ := game.Board.Slots[strconv.Itoa(int(c) + j)]
-                        if len(col_) > row && col_[row] == user.Username {
-                            num++
-                        } else {
-                            break
-                        }
-                    }
-                    if num == 4 {
-                        status = "win"
-                        break
-                    }
-                }
-            }
-            if status != "win" {
-                // check diagonal
-                startCol := int32(0)
-                if st := move.Col - (Winl - 1); st > startCol {
-                    startCol = st
-                }
-                endCol := move.Col
-                if en := Cols - 1; en < endCol {
-                    endCol = en
-                }
-                for c := startCol; c <= endCol; c++ {
-                    startRow := (len(game.Board.Slots[strconv.Itoa(int(move.Col))]) - 1) - int(move.Col - c)
-                    num := 0
-                    for j := 0; j < int(Winl); j++ {
-                        col_ := game.Board.Slots[strconv.Itoa(int(c) + j)]
-                        row := startRow + j
-                        if (row < 0) {
-                            break
-                        }
-                        if len(col_) > row && col_[row] == user.Username {
-                            num++
-                        } else {
-                            break
-                        }
-                    }
-                    if num == 4 {
-                        status = "win"
-                        break
-                    }
-                }
-            }
-            if status != "win" {
-                // check other diagonal
-                startCol := int32(0)
-                if st := move.Col - (Winl - 1); st > startCol {
-                    startCol = st
-                }
-                endCol := move.Col
-                if en := Cols - 1; en < endCol {
-                    endCol = en
-                }
-                fmt.Print("- ")
-                fmt.Print(startCol)
-                fmt.Print(", ")
-                fmt.Println(endCol)
-                for c := startCol; c <= endCol; c++ {
-                    fmt.Println("-- ")
-                    startRow := (len(game.Board.Slots[strconv.Itoa(int(move.Col))]) - 1) + int(move.Col - c)
-                    num := 0
-                    for j := 0; j < int(Winl); j++ {
-                        col_ := game.Board.Slots[strconv.Itoa(int(c) + j)]
-                        row := startRow - j
-                        fmt.Print("--- ")
-                        fmt.Print(int(c) + j)
-                        fmt.Print(", ")
-                        fmt.Print(row)
-                        fmt.Print(": ")
-                        if row < 0 || row >= int(Rows) || len(col_) <= row {
-                            break
-                        }
-                        fmt.Println(col_[row])
-                        if col_[row] == user.Username {
-                            num++
-                        } else {
-                            break
-                        }
-                    }
-                    if num == 4 {
-                        status = "win"
-                        break
-                    }
-                }
-            }
-        }
-        response := GameMoveResponse{game, status, details}
-        json.NewEncoder(w).Encode(response)
+			// Check if they've won
+			colL := len(col)
+			// col is the old col, so this is weird.
+			if colL >= int(Winl)-1 {
+				// check column
+				check := col[colL-int(Winl-1):]
+				if check[0] == user.Username &&
+					check[1] == user.Username &&
+					check[2] == user.Username {
+					status = "win"
+				}
+			}
+			if status != "win" {
+				// check row
+				start := int32(0)
+				if st := move.Col - (Winl - 1); st > start {
+					start = st
+				}
+				end := move.Col
+				if en := Cols - 1; en < end {
+					end = en
+				}
+				row := len(game.Board.Slots[strconv.Itoa(int(move.Col))]) - 1
+				for c := start; c <= end; c++ {
+					num := 0
+					for j := 0; j < int(Winl); j++ {
+						col_ := game.Board.Slots[strconv.Itoa(int(c)+j)]
+						if len(col_) > row && col_[row] == user.Username {
+							num++
+						} else {
+							break
+						}
+					}
+					if num == 4 {
+						status = "win"
+						break
+					}
+				}
+			}
+			if status != "win" {
+				// check diagonal
+				startCol := int32(0)
+				if st := move.Col - (Winl - 1); st > startCol {
+					startCol = st
+				}
+				endCol := move.Col
+				if en := Cols - 1; en < endCol {
+					endCol = en
+				}
+				for c := startCol; c <= endCol; c++ {
+					startRow := (len(game.Board.Slots[strconv.Itoa(int(move.Col))]) - 1) - int(move.Col-c)
+					num := 0
+					for j := 0; j < int(Winl); j++ {
+						col_ := game.Board.Slots[strconv.Itoa(int(c)+j)]
+						row := startRow + j
+						if row < 0 {
+							break
+						}
+						if len(col_) > row && col_[row] == user.Username {
+							num++
+						} else {
+							break
+						}
+					}
+					if num == 4 {
+						status = "win"
+						break
+					}
+				}
+			}
+			if status != "win" {
+				// check other diagonal
+				startCol := int32(0)
+				if st := move.Col - (Winl - 1); st > startCol {
+					startCol = st
+				}
+				endCol := move.Col
+				if en := Cols - 1; en < endCol {
+					endCol = en
+				}
+				fmt.Print("- ")
+				fmt.Print(startCol)
+				fmt.Print(", ")
+				fmt.Println(endCol)
+				for c := startCol; c <= endCol; c++ {
+					fmt.Println("-- ")
+					startRow := (len(game.Board.Slots[strconv.Itoa(int(move.Col))]) - 1) + int(move.Col-c)
+					num := 0
+					for j := 0; j < int(Winl); j++ {
+						col_ := game.Board.Slots[strconv.Itoa(int(c)+j)]
+						row := startRow - j
+						fmt.Print("--- ")
+						fmt.Print(int(c) + j)
+						fmt.Print(", ")
+						fmt.Print(row)
+						fmt.Print(": ")
+						if row < 0 || row >= int(Rows) || len(col_) <= row {
+							break
+						}
+						fmt.Println(col_[row])
+						if col_[row] == user.Username {
+							num++
+						} else {
+							break
+						}
+					}
+					if num == 4 {
+						status = "win"
+						break
+					}
+				}
+			}
+		}
+		response := GameMoveResponse{game, status, details}
+		json.NewEncoder(w).Encode(response)
 
-        if status == "win" {
-            delete(ActiveGamesById, game.Id)
-            delete(PendingGamesById, game.Id)
-            delete(UsersGames, UsersByUsername[game.Player1].Id)
-            delete(UsersGames, UsersByUsername[game.Player2].Id)
-        }
-    }()
+		if status == "win" {
+			delete(ActiveGamesById, game.Id)
+			delete(PendingGamesById, game.Id)
+			delete(UsersGames, UsersByUsername[game.Player1].Id)
+			delete(UsersGames, UsersByUsername[game.Player2].Id)
+		}
+	}()
 
 	gameid, err = getGameId(w, r)
 	if err != nil {
-        status = "illegal"
-        details = "Game doesn't exist"
-        return
+		status = "illegal"
+		details = "Game doesn't exist"
+		return
 	}
 
 	game, exists = ActiveGamesById[gameid]
 	if !exists {
-        status = "illegal"
-        details = "Game not started"
-        return
+		status = "illegal"
+		details = "Game not started"
+		return
 	}
 
-    if user.Username != game.Player1 && user.Username != game.Player2 {
-        status = "illegal"
-        details = "not your game"
-        return
-    }
-
+	if user.Username != game.Player1 && user.Username != game.Player2 {
+		status = "illegal"
+		details = "not your game"
+		return
+	}
 
 	body, err := ioutil.ReadAll(io.LimitReader(r.Body, 2048))
 	if err != nil {
-        status = "illegal"
-        details = "invalid request"
-        return
+		status = "illegal"
+		details = "invalid request"
+		return
 	}
 	if err := r.Body.Close(); err != nil {
-        status = "illegal"
-        details = "invalid request"
-        return
+		status = "illegal"
+		details = "invalid request"
+		return
 	}
 	if err := json.Unmarshal(body, &move); err != nil {
-        status = "illegal"
-        details = "invalid request"
-        return
+		status = "illegal"
+		details = "invalid request"
+		return
 	}
 
 	defer func() {
@@ -297,34 +297,34 @@ func GameMove(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-    if game.LastPlay == user.Username {
-        status = "illegal"
-        details = "not your turn"
-        return
-    }
+	if game.LastPlay == user.Username {
+		status = "illegal"
+		details = "not your turn"
+		return
+	}
 
-    if move.Col >= Cols || move.Col < 0 {
-        status = "illegal"
-        details = "not a valid column"
-        return
-    }
+	if move.Col >= Cols || move.Col < 0 {
+		status = "illegal"
+		details = "not a valid column"
+		return
+	}
 
-    colIdx := strconv.Itoa(int(move.Col))
-    if col, exists = game.Board.Slots[colIdx]; !exists {
-        game.Board.Slots[colIdx] = make([]string, 1)
-        game.Board.Slots[colIdx][0] = user.Username
-        status = "success"
-        return
-    } else {
-        if len(col) >= int(Rows) {
-            status = "illegal"
-            details = "row is full"
-            return
-        }
-        game.Board.Slots[colIdx] = append(col, user.Username)
-        status = "success"
-        return
-    }
+	colIdx := strconv.Itoa(int(move.Col))
+	if col, exists = game.Board.Slots[colIdx]; !exists {
+		game.Board.Slots[colIdx] = make([]string, 1)
+		game.Board.Slots[colIdx][0] = user.Username
+		status = "success"
+		return
+	} else {
+		if len(col) >= int(Rows) {
+			status = "illegal"
+			details = "row is full"
+			return
+		}
+		game.Board.Slots[colIdx] = append(col, user.Username)
+		status = "success"
+		return
+	}
 }
 
 func GameDelete(w http.ResponseWriter, r *http.Request) {
@@ -332,26 +332,26 @@ func GameDelete(w http.ResponseWriter, r *http.Request) {
 
 	gameid, err := getGameId(w, r)
 	if err != nil {
-        return
+		return
 	}
 
 	game, exists := ActiveGamesById[gameid]
 	if exists {
-        if user.Username != game.Player1 && user.Username != game.Player2 {
-            return
-        }
-        delete(ActiveGamesById, game.Id)
-        delete(UsersGames, UsersByUsername[game.Player1].Id)
-        delete(UsersGames, UsersByUsername[game.Player2].Id)
-        return
+		if user.Username != game.Player1 && user.Username != game.Player2 {
+			return
+		}
+		delete(ActiveGamesById, game.Id)
+		delete(UsersGames, UsersByUsername[game.Player1].Id)
+		delete(UsersGames, UsersByUsername[game.Player2].Id)
+		return
 	} else {
-        game, exists := PendingGamesById[gameid]
-        if exists {
-            if user.Username != game.Player1 {
-                return
-            }
-            delete(PendingGamesById, game.Id)
-            delete(UsersGames, user.Id)
-        }
-    }
+		game, exists := PendingGamesById[gameid]
+		if exists {
+			if user.Username != game.Player1 {
+				return
+			}
+			delete(PendingGamesById, game.Id)
+			delete(UsersGames, user.Id)
+		}
+	}
 }
